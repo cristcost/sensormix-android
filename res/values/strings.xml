@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">SensorMix Android</string>
+    <string name="action_settings">Settings</string>
+    <string name="welcome_details">Switch to Service Control to start or stop the service. Use settings to setup your device id and the server URL.</string>
+    <string name="title_activity_service_control">Control Background Service</string>
+    <string name="action_service_control">Service Control</string>
+    <string name="start_service">Start Service</string>
+    <string name="stop_service">Stop Service</string>
+    <string name="service_control_description">Start and stop the service sending sensor values</string>
+    <string name="pref_default_server_url">http://192.168.1.36:8080/test</string>
+    <string name="pref_title_server_url">SensorMix Server URL</string>
+    <string name="pref_default_device_id">my_device_id</string>
+    <string name="pref_title_device_id">Device ID</string>
+    <string name="title_home">Home</string>
+    <string name="title_service_control">Service Control</string>
+    <string name="title_settings">Settings</string>
+
+</resources>

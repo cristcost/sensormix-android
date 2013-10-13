@@ -1,0 +1,31 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
+     
+    <EditTextPreference
+        android:defaultValue="@string/pref_default_server_url"
+        android:inputType="textUri"
+        android:key="server_url"
+        android:maxLines="1"
+        android:selectAllOnFocus="true"
+        android:singleLine="true"
+        android:title="@string/pref_title_server_url" />
+    
+    <EditTextPreference
+        android:defaultValue="@string/pref_default_device_id"
+        android:inputType="textUri"
+        android:key="device_id"
+        android:maxLines="1"
+        android:selectAllOnFocus="true"
+        android:singleLine="true"
+        android:title="@string/pref_title_device_id" />
+    
+    
+    <ListPreference
+        android:defaultValue="5"
+        android:entries="@array/pref_sync_frequency_titles"
+        android:entryValues="@array/pref_sync_frequency_values"
+        android:key="sync_frequency"
+        android:negativeButtonText="@null"
+        android:positiveButtonText="@null"
+        android:title="@string/pref_title_sync_frequency" />
+    
+</PreferenceScreen>
