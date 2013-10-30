@@ -5,6 +5,11 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import org.apache.http.HttpResponse;
@@ -48,6 +53,9 @@ public class TrackingService extends Service implements Runnable {
 		}
 	}
 
+	private final ScheduledExecutorService executorService;
+	private final BlockingQueue<String> queue;
+
 	private static final DateFormat dateFormat = new SimpleDateFormat(
 			"yyyy-MM-dd HH:mm:ss.SSS");
 
@@ -58,11 +66,7 @@ public class TrackingService extends Service implements Runnable {
 
 	private Handler handler;
 
-	private boolean isActive;
-
-	private Thread t;
-
-	private Object deviceId;
+	private String deviceId;
 
 	private String serverUrl;
 
@@ -70,6 +74,8 @@ public class TrackingService extends Service implements Runnable {
 
 	public TrackingService() {
 		handler = new Handler();
+		executorService = Executors.newSingleThreadScheduledExecutor();
+		queue = new LinkedBlockingQueue<String>(64);
 	}
 
 	@Override
@@ -109,47 +115,8 @@ public class TrackingService extends Service implements Runnable {
 	@Override
 	public void run() {
 		try {
-			while (isActive) {
-
-				JSONObject obj = new JSONObject();
-
-				obj.put("device_id", deviceId);
-				obj.put("time", getCurrentTimeAsString());
-				obj.put("battery_level", readBatteryLevel());
-
-				Location location = getGpsPosition();
-				JSONObject positionObj = new JSONObject();
-
-				positionObj.put("lat", location.getLatitude());
-				positionObj.put("lng", location.getLongitude());
-				positionObj.put("alt", location.getAltitude());
-				positionObj.put("time",
-						getTimeAsString(new Date(location.getTime())));
-				positionObj.put("accuracy", location.getAccuracy());
-				positionObj.put("bearing", location.getBearing());
-				positionObj.put("speed", location.getSpeed());
-
-				obj.put("position", positionObj);
-
-				List<ScanResult> scanResults = getWifiFootprint();
-				JSONArray scanresultsObj = new JSONArray();
-				for (ScanResult s : scanResults) {
-					JSONObject scanObj = new JSONObject();
-
-					scanObj.put("frequency", s.frequency);
-					scanObj.put("level", s.level);
-					scanObj.put("bssid", s.BSSID);
-					scanObj.put("capabilities", s.capabilities);
-					scanObj.put("ssid", s.SSID);
-
-					scanresultsObj.put(scanObj);
-				}
-				obj.put("wifi_scans", scanresultsObj);
-				postData(serverUrl, obj);
-				Thread.sleep(syncFrequency * 1000);
-			}
-		} catch (InterruptedException e) {
-			logger.info("Service cycle interrupted! " + e.getMessage());
+			JSONObject obj = createJsonPacket();
+			postData(serverUrl, obj);
 		} catch (RuntimeException e) {
 			logger.info("Service runtime exception! " + e.getMessage());
 		} catch (JSONException e) {
@@ -157,37 +124,77 @@ public class TrackingService extends Service implements Runnable {
 		}
 	}
 
-	public void startProcessing() {
-		if (t == null) {
-			isActive = true;
-			SharedPreferences p = PreferenceManager
-					.getDefaultSharedPreferences(this);
+	private JSONObject createJsonPacket() throws JSONException {
+		JSONObject obj = new JSONObject();
 
-			serverUrl = p.getString("server_url", "");
-			String syncFrequencyString = p.getString("sync_frequency", "5");
-			try {
-				syncFrequency = Long.parseLong(syncFrequencyString);
-			} catch (NumberFormatException e) {
-				syncFrequency = 5;
-			}
-			deviceId = p.getString("device_id",
-					Secure.getString(getContentResolver(), Secure.ANDROID_ID));
-			t = new Thread(this);
-			t.start();
+		obj.put("device_id", deviceId);
+		obj.put("time", getCurrentTimeAsString());
+		obj.put("battery_level", readBatteryLevel());
+
+		Location location = getGpsPosition();
+		if (location != null) {
+			JSONObject positionObj = new JSONObject();
+
+			positionObj.put("lat", location.getLatitude());
+			positionObj.put("lng", location.getLongitude());
+			positionObj.put("alt", location.getAltitude());
+			positionObj.put("time",
+					getTimeAsString(new Date(location.getTime())));
+			positionObj.put("accuracy", location.getAccuracy());
+			positionObj.put("bearing", location.getBearing());
+			positionObj.put("speed", location.getSpeed());
+
+			obj.put("position", positionObj);
 		}
+
+		List<ScanResult> scanResults = getWifiFootprint();
+		if (scanResults != null) {
+			JSONArray scanresultsObj = new JSONArray();
+			for (ScanResult s : scanResults) {
+				JSONObject scanObj = new JSONObject();
+
+				scanObj.put("frequency", s.frequency);
+				scanObj.put("level", s.level);
+				scanObj.put("bssid", s.BSSID);
+				scanObj.put("capabilities", s.capabilities);
+				scanObj.put("ssid", s.SSID);
+
+				scanresultsObj.put(scanObj);
+			}
+			obj.put("wifi_scans", scanresultsObj);
+		}
+		return obj;
+	}
+
+	public void startProcessing() {
+		setupServiceParametersFromPreferences();
+
+		executorService.scheduleAtFixedRate(this, 0, syncFrequency,
+				TimeUnit.SECONDS);
+	}
+
+	private void setupServiceParametersFromPreferences() {
+		SharedPreferences p = PreferenceManager
+				.getDefaultSharedPreferences(this);
+
+		serverUrl = p.getString("server_url", "");
+		String syncFrequencyString = p.getString("sync_frequency", "5");
+		try {
+			syncFrequency = Long.parseLong(syncFrequencyString);
+		} catch (NumberFormatException e) {
+			syncFrequency = 5;
+		}
+		deviceId = p.getString("device_id",
+				Secure.getString(getContentResolver(), Secure.ANDROID_ID));
 	}
 
 	public void stopProcessing() {
-		isActive = false;
-
+		executorService.shutdown();
 		try {
-			t.join();
+			executorService.awaitTermination(30, TimeUnit.SECONDS);
 		} catch (InterruptedException e) {
-			logger.info("Service cycle interrupted! " + e.getMessage());
-		} catch (Exception e) {
-			logger.info("Service runtime exception! " + e.getMessage());
+			postToastToGui("Service terminated after 30 seconds!");
 		}
-		t = null;
 	}
 
 	public void stopService() {
@@ -223,27 +230,38 @@ public class TrackingService extends Service implements Runnable {
 		return wifiManager.getScanResults();
 	}
 
-	private void postData(String url, JSONObject obj) {
+	private void postData(String url, JSONObject jsonSamplePacket) {
 
 		HttpParams myParams = new BasicHttpParams();
 		HttpConnectionParams.setConnectionTimeout(myParams, 10000);
 		HttpConnectionParams.setSoTimeout(myParams, 10000);
 		HttpClient httpclient = new DefaultHttpClient(myParams);
-		String json = obj.toString();
 
 		try {
+			queue.offer(jsonSamplePacket.toString(), 10, TimeUnit.SECONDS);
+		} catch (InterruptedException e1) {
+			postToastToGui("Unable to queue sample in sensormix! Sample is lost...");
+		}
 
-			HttpPost httppost = new HttpPost(url.toString());
-			httppost.setHeader("Content-type", "application/json");
+		try {
+			String bodyForHttpPostRequest;
+			while ((bodyForHttpPostRequest = queue.peek()) != null) {
 
-			StringEntity se = new StringEntity(json);
-			se.setContentEncoding(new BasicHeader(HTTP.CONTENT_TYPE,
-					"application/json"));
-			httppost.setEntity(se);
+				HttpPost httppost = new HttpPost(url.toString());
+				httppost.setHeader("Content-type", "application/json");
 
-			HttpResponse response = httpclient.execute(httppost);
-			String temp = EntityUtils.toString(response.getEntity());
-			logger.info("JSON post response: " + temp);
+				StringEntity se = new StringEntity(bodyForHttpPostRequest);
+				se.setContentEncoding(new BasicHeader(HTTP.CONTENT_TYPE,
+						"application/json"));
+				httppost.setEntity(se);
+
+				HttpResponse response = httpclient.execute(httppost);
+				String temp = EntityUtils.toString(response.getEntity());
+				logger.info("JSON post response: " + temp);
+
+				// sample sent, let's remove from the queue
+				queue.poll();
+			}
 
 		} catch (ClientProtocolException e) {
 			logger.info("Service ClientProtocolException! " + e.getMessage());
