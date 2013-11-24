@@ -47,6 +47,8 @@ import android.widget.Toast;
 
 public class TrackingService extends Service implements Runnable {
 
+	private static final String DEVICE_TYPE = "urn:rixf:net.sensormix/device_types/android";
+
 	public class TrackingServiceBinder extends Binder {
 		TrackingService getService() {
 			return TrackingService.this;
@@ -115,7 +117,7 @@ public class TrackingService extends Service implements Runnable {
 	@Override
 	public void run() {
 		try {
-			JSONObject obj = createJsonPacket();
+			JSONObject obj = createJsonUpdatePacket();
 			postData(serverUrl, obj);
 		} catch (RuntimeException e) {
 			logger.info("Service runtime exception! " + e.getMessage());
@@ -124,9 +126,13 @@ public class TrackingService extends Service implements Runnable {
 		}
 	}
 
-	private JSONObject createJsonPacket() throws JSONException {
+	private JSONObject createJsonUpdatePacket() throws JSONException {
+		
+		JSONObject root = new JSONObject();
+		
 		JSONObject obj = new JSONObject();
-
+		root.put("sample", obj);
+		
 		obj.put("device_id", deviceId);
 		obj.put("time", getCurrentTimeAsString());
 		obj.put("battery_level", readBatteryLevel());
@@ -163,12 +169,27 @@ public class TrackingService extends Service implements Runnable {
 			}
 			obj.put("wifi_scans", scanresultsObj);
 		}
-		return obj;
+		return root;
 	}
+	
+	private JSONObject createJsonDefinitionPacket() throws JSONException {
+		JSONObject root = new JSONObject();	
+		JSONObject obj = new JSONObject();	
+		root.put("sensor", obj);
+		String name = android.os.Build.MODEL + " " + android.os.Build.ID;
+		String description = "Android: " + android.os.Build.VERSION.RELEASE;
+		description += " - Model: " + android.os.Build.MODEL;
+		obj.put("id", deviceId);
+		obj.put("type", DEVICE_TYPE);
+		obj.put("name", name);
+		obj.put("description", description);
+		return root;
+	}
+	
 
 	public void startProcessing() {
 		setupServiceParametersFromPreferences();
-
+		sendDefinition();
 		executorService.scheduleAtFixedRate(this, 0, syncFrequency,
 				TimeUnit.SECONDS);
 	}
@@ -186,6 +207,17 @@ public class TrackingService extends Service implements Runnable {
 		}
 		deviceId = p.getString("device_id",
 				Secure.getString(getContentResolver(), Secure.ANDROID_ID));
+	}
+	
+	private void sendDefinition() {
+		try {
+			JSONObject obj = createJsonDefinitionPacket();
+			postData(serverUrl + "sensor", obj);
+		} catch (RuntimeException e) {
+			logger.info("Service runtime exception! " + e.getMessage());
+		} catch (JSONException e) {
+			logger.info("Service JSONException exception! " + e.getMessage());
+		}		
 	}
 
 	public void stopProcessing() {
