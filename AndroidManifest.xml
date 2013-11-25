@@ -38,6 +38,10 @@
         <service
             android:name="com.google.developers.gdgfirenze.android.TrackingService"
             android:enabled="true" />
+        <service
+            android:name="com.google.developers.gdgfirenze.android.DataSenderService"
+            android:exported="false" >
+        </service>
     </application>
 
 </manifest>

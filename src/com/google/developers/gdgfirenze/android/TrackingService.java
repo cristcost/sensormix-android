@@ -1,29 +1,14 @@
 package com.google.developers.gdgfirenze.android;
 
-import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.message.BasicHeader;
-import org.apache.http.params.BasicHttpParams;
-import org.apache.http.params.HttpConnectionParams;
-import org.apache.http.params.HttpParams;
-import org.apache.http.protocol.HTTP;
-import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -56,7 +41,6 @@ public class TrackingService extends Service implements Runnable {
 	}
 
 	private final ScheduledExecutorService executorService;
-	private final BlockingQueue<String> queue;
 
 	private static final DateFormat dateFormat = new SimpleDateFormat(
 			"yyyy-MM-dd HH:mm:ss.SSS");
@@ -70,14 +54,11 @@ public class TrackingService extends Service implements Runnable {
 
 	private String deviceId;
 
-	private String serverUrl;
-
 	private long syncFrequency;
 
 	public TrackingService() {
 		handler = new Handler();
 		executorService = Executors.newSingleThreadScheduledExecutor();
-		queue = new LinkedBlockingQueue<String>(64);
 	}
 
 	@Override
@@ -118,7 +99,7 @@ public class TrackingService extends Service implements Runnable {
 	public void run() {
 		try {
 			JSONObject obj = createJsonUpdatePacket();
-			postData(serverUrl, obj);
+			postData(obj);
 		} catch (RuntimeException e) {
 			logger.info("Service runtime exception! " + e.getMessage());
 		} catch (JSONException e) {
@@ -198,7 +179,6 @@ public class TrackingService extends Service implements Runnable {
 		SharedPreferences p = PreferenceManager
 				.getDefaultSharedPreferences(this);
 
-		serverUrl = p.getString("server_url", "");
 		String syncFrequencyString = p.getString("sync_frequency", "5");
 		try {
 			syncFrequency = Long.parseLong(syncFrequencyString);
@@ -212,7 +192,7 @@ public class TrackingService extends Service implements Runnable {
 	private void sendDefinition() {
 		try {
 			JSONObject obj = createJsonDefinitionPacket();
-			postData(serverUrl + "sensor", obj);
+			postData(obj);
 		} catch (RuntimeException e) {
 			logger.info("Service runtime exception! " + e.getMessage());
 		} catch (JSONException e) {
@@ -262,44 +242,10 @@ public class TrackingService extends Service implements Runnable {
 		return wifiManager.getScanResults();
 	}
 
-	private void postData(String url, JSONObject jsonSamplePacket) {
-
-		HttpParams myParams = new BasicHttpParams();
-		HttpConnectionParams.setConnectionTimeout(myParams, 10000);
-		HttpConnectionParams.setSoTimeout(myParams, 10000);
-		HttpClient httpclient = new DefaultHttpClient(myParams);
-
-		try {
-			queue.offer(jsonSamplePacket.toString(), 10, TimeUnit.SECONDS);
-		} catch (InterruptedException e1) {
-			postToastToGui("Unable to queue sample in sensormix! Sample is lost...");
-		}
-
-		try {
-			String bodyForHttpPostRequest;
-			while ((bodyForHttpPostRequest = queue.peek()) != null) {
-
-				HttpPost httppost = new HttpPost(url.toString());
-				httppost.setHeader("Content-type", "application/json");
-
-				StringEntity se = new StringEntity(bodyForHttpPostRequest);
-				se.setContentEncoding(new BasicHeader(HTTP.CONTENT_TYPE,
-						"application/json"));
-				httppost.setEntity(se);
-
-				HttpResponse response = httpclient.execute(httppost);
-				String temp = EntityUtils.toString(response.getEntity());
-				logger.info("JSON post response: " + temp);
-
-				// sample sent, let's remove from the queue
-				queue.poll();
-			}
-
-		} catch (ClientProtocolException e) {
-			logger.info("Service ClientProtocolException! " + e.getMessage());
-		} catch (IOException e) {
-			logger.info("Service IOException! " + e.getMessage());
-		}
+	private void postData(JSONObject jsonSamplePacket) {
+		Intent intent = new Intent(this, DataSenderService.class);
+		intent.putExtra(DataSenderService.INTENT_EXTRA, jsonSamplePacket.toString());
+		startService(intent);
 	}
 
 	private void postToastToGui(final String msg) {
