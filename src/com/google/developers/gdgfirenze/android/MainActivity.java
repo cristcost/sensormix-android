@@ -5,12 +5,10 @@ import android.app.Activity;
 import android.app.Fragment;
 import android.content.Intent;
 import android.os.Bundle;
-import android.preference.ListPreference;
-import android.preference.Preference;
-import android.preference.PreferenceFragment;
-import android.preference.PreferenceManager;
-
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
@@ -25,6 +23,10 @@ public class MainActivity extends Activity implements
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
+		getFragmentManager().beginTransaction()
+				.replace(R.id.container, new ServiceControlSectionFragment())
+				.commit();
+
 		// Set up the action bar to show a dropdown list.
 		final ActionBar actionBar = getActionBar();
 		actionBar.setDisplayShowTitleEnabled(false);
@@ -32,13 +34,13 @@ public class MainActivity extends Activity implements
 
 		// Set up the dropdown list navigation in the action bar.
 		actionBar.setListNavigationCallbacks(
-		// Specify a SpinnerAdapter to populate the dropdown list.
+				// Specify a SpinnerAdapter to populate the dropdown list.
 				new ArrayAdapter<String>(actionBar.getThemedContext(),
 						android.R.layout.simple_list_item_1,
 						android.R.id.text1, new String[] {
 								getString(R.string.title_home),
-								getString(R.string.title_service_control),
-								getString(R.string.title_settings), }), this);
+								getString(R.string.title_service_control) }),
+				this);
 	}
 
 	@Override
@@ -47,6 +49,27 @@ public class MainActivity extends Activity implements
 		if (savedInstanceState.containsKey(STATE_SELECTED_NAVIGATION_ITEM)) {
 			getActionBar().setSelectedNavigationItem(
 					savedInstanceState.getInt(STATE_SELECTED_NAVIGATION_ITEM));
+		}
+	}
+
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		// Inflate the menu items for use in the action bar
+		MenuInflater inflater = getMenuInflater();
+		inflater.inflate(R.menu.main_activity_actions, menu);
+		return super.onCreateOptionsMenu(menu);
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		// Handle presses on the action bar items
+		switch (item.getItemId()) {
+		case R.id.action_settings:
+			Intent intent = new Intent(this, SettingsActivity.class);
+			startActivity(intent);
+			return true;
+		default:
+			return super.onOptionsItemSelected(item);
 		}
 	}
 
@@ -73,12 +96,6 @@ public class MainActivity extends Activity implements
 					.beginTransaction()
 					.replace(R.id.container,
 							new ServiceControlSectionFragment()).commit();
-			break;
-		case 2:
-			getFragmentManager().beginTransaction()
-					.replace(R.id.container, new GeneralPreferenceFragment())
-					.commit();
-
 			break;
 		}
 
@@ -135,58 +152,6 @@ public class MainActivity extends Activity implements
 
 			return rootView;
 		}
-	}
-
-	public static class GeneralPreferenceFragment extends PreferenceFragment {
-		@Override
-		public void onCreate(Bundle savedInstanceState) {
-			super.onCreate(savedInstanceState);
-			addPreferencesFromResource(R.xml.pref_app_configuration);
-
-			bindPreferenceSummaryToValue(findPreference("server_url"));
-			bindPreferenceSummaryToValue(findPreference("device_id"));
-			bindPreferenceSummaryToValue(findPreference("sync_frequency"));
-		}
-	}
-
-	private static Preference.OnPreferenceChangeListener sBindPreferenceSummaryToValueListener = new Preference.OnPreferenceChangeListener() {
-		@Override
-		public boolean onPreferenceChange(Preference preference, Object value) {
-			String stringValue = value.toString();
-
-			if (preference instanceof ListPreference) {
-				// For list preferences, look up the correct display value in
-				// the preference's 'entries' list.
-				ListPreference listPreference = (ListPreference) preference;
-				int index = listPreference.findIndexOfValue(stringValue);
-
-				// Set the summary to reflect the new value.
-				preference
-						.setSummary(index >= 0 ? listPreference.getEntries()[index]
-								: null);
-
-			} else {
-				// For all other preferences, set the summary to the value's
-				// simple string representation.
-				preference.setSummary(stringValue);
-			}
-			return true;
-		}
-	};
-
-	private static void bindPreferenceSummaryToValue(Preference preference) {
-		// Set the listener to watch for value changes.
-		preference
-				.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-
-		// Trigger the listener immediately with the preference's
-		// current value.
-		sBindPreferenceSummaryToValueListener.onPreferenceChange(
-				preference,
-				PreferenceManager.getDefaultSharedPreferences(
-						preference.getContext()).getString(preference.getKey(),
-						""));
-
 	}
 
 }
