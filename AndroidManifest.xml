@@ -47,6 +47,14 @@
             android:name="com.google.developers.gdgfirenze.android.SettingsActivity"
             android:label="@string/title_activity_settings" >
         </activity>
+        <activity
+            android:name="com.google.developers.gdgfirenze.android.NfcWriteActivity"
+            android:label="@string/title_activity_nfc_write" >
+            <intent-filter>
+                <action android:name="com.google.developers.gdgfirenze.android.WRITE_NFC" />  
+                <category android:name="android.intent.category.DEFAULT" />    
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>
