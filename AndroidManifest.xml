@@ -31,8 +31,12 @@
             android:label="@string/app_name" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/com.google.developers.gdgfirenze.android" />
             </intent-filter>
         </activity>
 
@@ -52,8 +56,9 @@
             android:name="com.google.developers.gdgfirenze.android.NfcWriteActivity"
             android:label="@string/title_activity_nfc_write" >
             <intent-filter>
-                <action android:name="com.google.developers.gdgfirenze.android.WRITE_NFC" />  
-                <category android:name="android.intent.category.DEFAULT" />    
+                <action android:name="com.google.developers.gdgfirenze.android.WRITE_NFC" />
+
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
     </application>
