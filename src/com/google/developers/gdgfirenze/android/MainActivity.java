@@ -59,6 +59,7 @@ public class MainActivity extends Activity implements
 				this);
 	}
 
+	@Override
 	public void onResume() {
 		super.onResume();
 		if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(getIntent().getAction())) {

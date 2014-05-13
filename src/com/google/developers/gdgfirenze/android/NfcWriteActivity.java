@@ -51,6 +51,7 @@ public class NfcWriteActivity extends Activity {
 		mAdapter = NfcAdapter.getDefaultAdapter(this);
 	}
 
+	@Override
 	public void onPause() {
 		super.onPause();
 		if (mAdapter != null) {
@@ -58,6 +59,7 @@ public class NfcWriteActivity extends Activity {
 		}
 	}
 
+	@Override
 	public void onResume() {
 		super.onResume();
 		if (mAdapter != null) {
@@ -66,6 +68,7 @@ public class NfcWriteActivity extends Activity {
 		}
 	}
 
+	@Override
 	public void onNewIntent(Intent intent) {
 		try {
 			Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
